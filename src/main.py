@@ -72,9 +72,7 @@ def conv_train(arch, epochs, procs, distributed, nodes, batches):
 @click.option('--batches', default=12, help='minibatch size to use.')
 def main(epochs, arch, procs, distributed, nodes, batches):
     
-    intro_text = pyfiglet.figlet_format('Parallel DNN Benchmark', font='slant')
-    
-    print(intro_text)
+    print("start training...")
 
     
     
@@ -105,7 +103,7 @@ def main(epochs, arch, procs, distributed, nodes, batches):
 
     end_text = pyfiglet.figlet_format('Finished benchmark', font='slant')
     
-    print(end_text)
+    print("finish training...")
     
 if __name__ == "__main__":
     main()
