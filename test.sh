@@ -1,0 +1,1 @@
+python3 src/main.py --epochs=2 --distributed=y --nodes=5 --procs=3 --arch=ff

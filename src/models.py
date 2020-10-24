@@ -69,20 +69,32 @@ class ConvNet(nn.Module):
         # Compute probabilities
         probs = F.log_softmax(x, dim=1)
         return probs
-
+def compare_weight(table,idx):
+    min_key=-1
+    min_value=float('inf')
+    for key,value in table.items():
+        if min_value>value:
+            min_key=key
+            min_value=value
+    if min_key==idx:
+        return True
+    else:
+        return False
 # Train and test models
-def train(epochs, arch, model, device, train_loader):
+def train(epochs, arch, model, device, train_loader,flag_table,lock):
     #train_data = get_train_data()
     optimiser = optim.SGD(model.parameters(), lr=0.001)
     
     total_time = 0
 
+    pid = os.getpid()
+    flag_table[pid]=float('inf') 
     for epoch in range(1, epochs + 1):
         start_time = time.time()
         model.train()
-        pid = os.getpid()
-        
+           
         for batch_idx, (data, target) in enumerate(train_loader):
+        
             data, target = data.to(device), target.to(device)
             optimiser.zero_grad()
             
@@ -92,11 +104,21 @@ def train(epochs, arch, model, device, train_loader):
                 output = model(data.view(-1, 28*28))
 
             loss = F.nll_loss(output, target)
-            
+
             loss.backward()
+            flag_table[pid]=loss.item()
             
+            while (True):
+                if compare_weight(flag_table,pid):
+                    break
+
+            lock.acquire()
+           
             optimiser.step()
-        
+            
+            lock.release()
+            flag_table[pid]=float('inf')
+            
         end_time = time.time()
         
         processing_time = end_time - start_time
@@ -116,7 +138,7 @@ def train(epochs, arch, model, device, train_loader):
         f.write(new_data)
         f.close()
 
-    print(f'Model metrics have been saved at: {latest_log}')
+    print(f'Model metrics have been saved at: {latest_log}, with {total_time}s training time.')
 
 def test(model, device, test_loader, arch):
     model.eval()

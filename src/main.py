@@ -20,6 +20,10 @@ def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
     
     model = model_class.to(device)
 
+    tag=mp.Manager()
+    flag_table=tag.dict()
+    lock=mp.Lock()
+
     if distributed=='y':
 
         processes = []
@@ -32,7 +36,7 @@ def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
 
             train_loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batches, sampler=DistributedSampler(dataset=trainset,num_replicas=procs,rank=rank))
 
-            p = mp.Process(target=train, args=(epochs, arch, model, device, train_loader))
+            p = mp.Process(target=train, args=(epochs, arch, model, device, train_loader,flag_table,lock))
 
             p.start()
 
@@ -75,7 +79,6 @@ def main(epochs, arch, procs, distributed, nodes, batches):
     print("start training...")
 
     
-    
     date_time = datetime.now().strftime("%d%m%Y%H%M%S")
 
     with open('src/log/' + date_time + '.json', 'w') as f:
@@ -101,7 +104,6 @@ def main(epochs, arch, procs, distributed, nodes, batches):
     elif arch == 'conv':
         conv_train(arch, epochs, procs, distributed, nodes, batches)
 
-    end_text = pyfiglet.figlet_format('Finished benchmark', font='slant')
     
     print("finish training...")
     
