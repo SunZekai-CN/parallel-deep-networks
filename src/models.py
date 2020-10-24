@@ -81,7 +81,7 @@ def compare_weight(table,idx):
     else:
         return False
 # Train and test models
-def train(epochs, arch, model, device, train_loader,flag_table,lock):
+def train(epochs, arch, model, device, train_loader,flag_table):
     #train_data = get_train_data()
     optimiser = optim.SGD(model.parameters(), lr=0.001)
     
@@ -111,12 +111,9 @@ def train(epochs, arch, model, device, train_loader,flag_table,lock):
             while (True):
                 if compare_weight(flag_table,pid):
                     break
-
-            lock.acquire()
            
             optimiser.step()
-            
-            lock.release()
+                     
             flag_table[pid]=float('inf')
             
         end_time = time.time()

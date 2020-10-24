@@ -36,7 +36,7 @@ def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
 
             train_loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batches, sampler=DistributedSampler(dataset=trainset,num_replicas=procs,rank=rank))
 
-            p = mp.Process(target=train, args=(epochs, arch, model, device, train_loader,flag_table,lock))
+            p = mp.Process(target=train, args=(epochs, arch, model, device, train_loader,flag_table))
 
             p.start()
 
