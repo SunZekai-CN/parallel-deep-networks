@@ -12,17 +12,17 @@ testset = datasets.QMNIST("", train=False, download=True, transform=(transforms.
 
 test_loader = torch.utils.data.DataLoader(dataset=testset, batch_size=12, shuffle=True)
 
-def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
+def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches,order,reduce):
 
     torch.set_num_threads(nodes)
-
+    
     device = torch.device("cpu")
     
     model = model_class.to(device)
 
     tag=mp.Manager()
-    flag_table=tag.dict()
-    lock=mp.Lock()
+    value_table=tag.dict()
+    training_time=tag.dict()
 
     if distributed=='y':
 
@@ -36,7 +36,7 @@ def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
 
             train_loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batches, sampler=DistributedSampler(dataset=trainset,num_replicas=procs,rank=rank))
 
-            p = mp.Process(target=train, args=(epochs, arch, model, device, train_loader,flag_table))
+            p = mp.Process(target=train, args=(epochs, arch, model, device, train_loader,value_table,order,reduce,training_time))
 
             p.start()
 
@@ -44,7 +44,12 @@ def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
 
         for p in processes:
             p.join()
-        
+        times = []
+        all_time = 0
+        for key,value in training_time.items():
+            times.append(value)
+            all_time+=value
+        click.echo(f'Training: sum = {all_time} , average = {all_time/len(times)} , max = {max(times)} , min = {min(times)}')
         test(model, device, test_loader, arch)
 
     else:
@@ -56,56 +61,38 @@ def hogwild(model_class, procs, epochs, arch, distributed, nodes, batches):
         test(model, device, test_loader, arch)
 
 
-def ff_train(arch, epochs, procs, distributed, nodes, batches):
-    click.echo(f'Training neural {arch}-net with {epochs} epochs using {procs} processes with distributed processing == {distributed}, {nodes} CPU cores and a batch size of {batches}.')
+def ff_train(arch, epochs, procs, distributed, nodes, batches,order,reduce):
+    click.echo(f'Training neural {arch}-net with {epochs} epochs using {procs} processes with distributed processing == {distributed}, {nodes} CPU cores and a batch size of {batches}.update paramter in order=={order},reduce = {reduce}')
     
     model_class = FeedforwardNet()
-    hogwild(model_class, procs, epochs, arch, distributed, nodes, batches)
+    hogwild(model_class, procs, epochs, arch, distributed, nodes, batches,order,reduce)
 
-def conv_train(arch, epochs, procs, distributed, nodes, batches):    
-    click.echo(f'Training neural {arch}-net with {epochs} epochs using {procs} processes with distributed processing == {distributed}, {nodes} CPU cores and a batch size of {batches}.')      
+def conv_train(arch, epochs, procs, distributed, nodes, batches,order,reduce):    
+    click.echo(f'Training neural {arch}-net with {epochs} epochs using {procs} processes with distributed processing == {distributed}, {nodes} CPU cores and a batch size of {batches}.update paramter in order=={order},reduce={reduce}')      
     model_class = ConvNet()
-    hogwild(model_class, procs, epochs, arch, distributed, nodes, batches)
+    hogwild(model_class, procs, epochs, arch, distributed, nodes, batches,order,reduce)
 
 @click.command()
 @click.option('--epochs', default=1, help='number of epochs to train neural network.')
 @click.option('--arch', default='ff', help='neural network architecture to benchmark (conv or ff).')
-@click.option('--distributed', default='n', help='whether to distribute data or not (y or n).')
+@click.option('--distributed', default='y', help='whether to distribute data or not (y or n).')
 @click.option('--procs', default=1, help='number of processes to spawn.')
 @click.option('--nodes', default=1, help='number of cores to use.')
 @click.option('--batches', default=12, help='minibatch size to use.')
-def main(epochs, arch, procs, distributed, nodes, batches):
+@click.option('--order', default='y', help='wether to update paramters in order or not (y or n)')
+@click.option('--reduce', default=0.001, help='number to reduce while update paramters fail')
+def main(epochs, arch, procs, distributed, nodes, batches,order,reduce):
     
-    print("start training...")
-
-    
-    date_time = datetime.now().strftime("%d%m%Y%H%M%S")
-
-    with open('src/log/' + date_time + '.json', 'w') as f:
-        params = {'architecture':arch, 
-        'num_epochs':epochs, 
-        'num_processes':procs, 
-        'threads':nodes, 
-        'is_distributed':distributed, 
-        'training_time': 'null', 
-        'accuracy': 'null',
-        'avg_loss': 'null',
-        'batch_size': batches
-        }
-
-        data = json.dumps(params)
-        f.write(data)
-        f.close()
-
-    
+    #print("start training...")
+  
     if arch == 'ff':            
-        ff_train(arch, epochs, procs, distributed, nodes, batches)
+        ff_train(arch, epochs, procs, distributed, nodes, batches,order,reduce)
     
     elif arch == 'conv':
-        conv_train(arch, epochs, procs, distributed, nodes, batches)
+        conv_train(arch, epochs, procs, distributed, nodes, batches,order,reduce)
 
     
-    print("finish training...")
+    #print("finish training...")
     
 if __name__ == "__main__":
     main()

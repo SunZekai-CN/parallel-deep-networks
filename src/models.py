@@ -69,26 +69,28 @@ class ConvNet(nn.Module):
         # Compute probabilities
         probs = F.log_softmax(x, dim=1)
         return probs
-def compare_weight(table,idx):
+def compare_weight(table,idx,reduce):
     min_key=-1
     min_value=float('inf')
     for key,value in table.items():
         if min_value>value:
             min_key=key
             min_value=value
-    if min_key==idx:
+    if min_key==idx:      
         return True
     else:
+        table[idx]-=reduce
         return False
 # Train and test models
-def train(epochs, arch, model, device, train_loader,flag_table):
+def train(epochs, arch, model, device, train_loader,value_table,order,reduce,training_time):
     #train_data = get_train_data()
     optimiser = optim.SGD(model.parameters(), lr=0.001)
     
     total_time = 0
 
     pid = os.getpid()
-    flag_table[pid]=float('inf') 
+    value_table[pid]=float('inf') 
+    
     for epoch in range(1, epochs + 1):
         start_time = time.time()
         model.train()
@@ -106,36 +108,28 @@ def train(epochs, arch, model, device, train_loader,flag_table):
             loss = F.nll_loss(output, target)
 
             loss.backward()
-            flag_table[pid]=loss.item()
+            if order=='y':
+                value_table[pid]=loss.item()
             
-            while (True):
-                if compare_weight(flag_table,pid):
-                    break
+                while (True):
+                    if compare_weight(value_table,pid,reduce):
+                        break
            
-            optimiser.step()
+                optimiser.step()
                      
-            flag_table[pid]=float('inf')
-            
+                value_table[pid]=float('inf')
+            else:
+                optimiser.step()
+                
         end_time = time.time()
         
         processing_time = end_time - start_time
         
         total_time += processing_time
-
-    # Write file with training metrics
-
-        latest_log = find_latest_log()
-
-    with open(latest_log) as f:
-        data = json.load(f)
-        data['training_time'] = total_time
-        new_data = json.dumps(data)
     
-    with open(latest_log,'w') as f:
-        f.write(new_data)
-        f.close()
+    training_time[pid] = total_time
 
-    print(f'Model metrics have been saved at: {latest_log}, with {total_time}s training time.')
+    #print(f'Model metrics have been saved at: {latest_log}, with {total_time}s training time.')
 
 def test(model, device, test_loader, arch):
     model.eval()
@@ -156,21 +150,7 @@ def test(model, device, test_loader, arch):
 
     test_loss /= len(test_loader.dataset)
 
-     # Write file with training metrics
-
-    latest_log = find_latest_log()
-
-    with open(latest_log) as f:
-        data = json.load(f)
-        data['accuracy'] = 100. * correct / len(test_loader.dataset)
-        data['avg_loss'] = test_loss
-        new_data = json.dumps(data)
-    
-    with open(latest_log,'w') as f:
-        f.write(new_data)
-        f.close()
-
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    print('Test set: Average loss: {:.6f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
 
